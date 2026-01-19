@@ -1,4 +1,232 @@
-function Runner(t, e) {
+            var errorPageController;
+            const HIDDEN_CLASS = "hidden";
+            function decodeUTF16Base64ToString(t) {
+                const e = atob(t);
+                let n = "";
+                for (let t = 0; t < e.length; t += 2)
+                    n += String.fromCharCode(256 * e.charCodeAt(t) + e.charCodeAt(t + 1));
+                return n;
+            }
+            function toggleHelpBox() {
+                const t = document.getElementById("details");
+                t.classList.toggle(HIDDEN_CLASS);
+                const e = document.getElementById("details-button");
+                if (
+                    (t.classList.contains(HIDDEN_CLASS)
+                        ? (e.innerText = e.detailsText)
+                        : (e.innerText = e.hideDetailsText),
+                    mobileNav)
+                ) {
+                    document.getElementById("main-content").classList.toggle(HIDDEN_CLASS);
+                    const t = document.querySelector(".runner-container");
+                    t && t.classList.toggle(HIDDEN_CLASS);
+                }
+            }
+            function diagnoseErrors() {
+                window.errorPageController &&
+                    errorPageController.diagnoseErrorsButtonClick();
+            }
+            let isSubFrame = !1;
+            function updateForDnsProbe(t) {
+                const e = new JsEvalContext(t);
+                jstProcess(e, document.getElementById("t")), onDocumentLoadOrUpdate();
+            }
+            function updateIconClass(t) {
+                const e = isSubFrame ? "#sub-frame-error" : "#main-frame-error",
+                    n = document.querySelector(e + " .icon");
+                n.classList.contains(t) || (n.className = "icon " + t);
+            }
+            function reloadButtonClick(t) {
+                window.errorPageController
+                    ? errorPageController.reloadButtonClick()
+                    : (window.location = t);
+            }
+            function downloadButtonClick() {
+                if (window.errorPageController) {
+                    errorPageController.downloadButtonClick();
+                    const t = document.getElementById("download-button");
+                    (t.disabled = !0),
+                        (t.textContent = t.disabledText),
+                        document
+                            .getElementById("download-link-wrapper")
+                            .classList.add(HIDDEN_CLASS),
+                        document
+                            .getElementById("download-link-clicked-wrapper")
+                            .classList.remove(HIDDEN_CLASS);
+                }
+            }
+            function detailsButtonClick() {
+                window.errorPageController && errorPageController.detailsButtonClick();
+            }
+            (window.top.location !== window.location || window.portalHost) &&
+                (document.documentElement.setAttribute("subframe", ""), (isSubFrame = !0));
+            let AvailableOfflineContent,
+                primaryControlOnLeft = !0;
+            function setAutoFetchState(t, e) {
+                document
+                    .getElementById("cancel-save-page-button")
+                    .classList.toggle(HIDDEN_CLASS, !t),
+                    document
+                        .getElementById("save-page-for-later-button")
+                        .classList.toggle(HIDDEN_CLASS, t || !e);
+            }
+            function savePageLaterClick() {
+                errorPageController.savePageForLater();
+            }
+            function cancelSavePageClick() {
+                errorPageController.cancelSavePage(), setAutoFetchState(!1, !0);
+            }
+            function toggleErrorInformationPopup() {
+                document
+                    .getElementById("error-information-popup-container")
+                    .classList.toggle(HIDDEN_CLASS);
+            }
+            function launchOfflineItem(t, e) {
+                errorPageController.launchOfflineItem(t, e);
+            }
+            function launchDownloadsPage() {
+                errorPageController.launchDownloadsPage();
+            }
+            function getIconForSuggestedItem(t) {
+                switch (t.content_type) {
+                    case 1:
+                        return "image-video";
+                    case 2:
+                        return "image-music-note";
+                    case 0:
+                    case 3:
+                        return "image-earth";
+                }
+                return "image-file";
+            }
+            function getSuggestedContentDiv(t, e) {
+                let n = "";
+                const o = [];
+                if (t.thumbnail_data_uri)
+                    o.push("suggestion-with-image"),
+                        (n = `<img src="${t.thumbnail_data_uri}">`);
+                else {
+                    o.push("suggestion-with-icon"),
+                        (n = `<div><img class="${getIconForSuggestedItem(t)}"></div>`);
+                }
+                let i = "";
+                return (
+                    t.favicon_data_uri
+                        ? (i = `<img src="${t.favicon_data_uri}">`)
+                        : o.push("no-favicon"),
+                    t.attribution_base64 || o.push("no-attribution"),
+                    `<div class="offline-content-suggestion ${o.join(
+                        " "
+                    )}"onclick="launchOfflineItem('${t.ID}', '${
+                        t.name_space
+                    }')"><div class="offline-content-suggestion-texts"><div id="offline-content-suggestion-title-${e}"class="offline-content-suggestion-title"></div><div class="offline-content-suggestion-attribution-freshness"><div id="offline-content-suggestion-favicon-${e}"class="offline-content-suggestion-favicon">${i}</div><div id="offline-content-suggestion-attribution-${e}"class="offline-content-suggestion-attribution"></div><div class="offline-content-suggestion-freshness">${
+                        t.date_modified
+                    }</div><div class="offline-content-suggestion-pin-spacer"></div><div class="offline-content-suggestion-pin"></div></div></div><div class="offline-content-suggestion-thumbnail">${n}</div></div>`
+                );
+            }
+            function offlineContentAvailable(t, e) {
+                if (!e || !loadTimeData.valueExists("offlineContentList")) return;
+                const n = [];
+                for (let t = 0; t < e.length; t++) n.push(getSuggestedContentDiv(e[t], t));
+                document.getElementById("offline-content-suggestions").innerHTML = n.join(
+                    "\n"
+                );
+                for (let t = 0; t < e.length; t++)
+                    (document.getElementById(
+                        `offline-content-suggestion-title-${t}`
+                    ).textContent = decodeUTF16Base64ToString(e[t].title_base64)),
+                        (document.getElementById(
+                            `offline-content-suggestion-attribution-${t}`
+                        ).textContent = decodeUTF16Base64ToString(e[t].attribution_base64));
+                const o = document.getElementById("offline-content-list");
+                "rtl" === document.dir && o.classList.add("is-rtl"),
+                    (o.hidden = !1),
+                    t && toggleOfflineContentListVisibility(!1);
+            }
+            function toggleOfflineContentListVisibility(t) {
+                if (!loadTimeData.valueExists("offlineContentList")) return;
+                const e = !document
+                    .getElementById("offline-content-list")
+                    .classList.toggle("list-hidden");
+                t &&
+                    window.errorPageController &&
+                    errorPageController.listVisibilityChanged(e);
+            }
+            function onDocumentLoadOrUpdate() {
+                const t =
+                        loadTimeData.valueExists("downloadButton") &&
+                        loadTimeData.getValue("downloadButton").msg,
+                    e = document.getElementById("details-button"),
+                    n = loadTimeData.valueExists("suggestedOfflineContentPresentation");
+                n &&
+                    (document.querySelector(".nav-wrapper").classList.add(HIDDEN_CLASS),
+                    e.classList.add(HIDDEN_CLASS),
+                    (document.getElementById("download-link").hidden = !t),
+                    document
+                        .getElementById("download-links-wrapper")
+                        .classList.remove(HIDDEN_CLASS),
+                    document
+                        .getElementById("error-information-popup-container")
+                        .classList.add("use-popup-container", HIDDEN_CLASS),
+                    document
+                        .getElementById("error-information-button")
+                        .classList.remove(HIDDEN_CLASS));
+                loadTimeData.valueExists("attemptAutoFetch") &&
+                    loadTimeData.getValue("attemptAutoFetch");
+                const o =
+                        loadTimeData.valueExists("reloadButton") &&
+                        loadTimeData.getValue("reloadButton").msg,
+                    i = document.getElementById("reload-button"),
+                    a = document.getElementById("download-button");
+                "none" === i.style.display &&
+                    "none" === a.style.display &&
+                    e.classList.add("singular"),
+                    (document.getElementById("control-buttons").hidden = n || !(o || t));
+                const s =
+                    loadTimeData.valueExists("iconClass") &&
+                    loadTimeData.getValue("iconClass");
+                updateIconClass(s),
+                    isSubFrame ||
+                        "icon-offline" !== s ||
+                        (document.documentElement.classList.add("offline"),
+                        new Runner(".interstitial-wrapper"));
+            }
+            function onDocumentLoad() {
+                const t = document.getElementById("buttons");
+                primaryControlOnLeft
+                    ? t.classList.add("suggested-left")
+                    : t.classList.add("suggested-right"),
+                    onDocumentLoadOrUpdate();
+            }
+            document.addEventListener("DOMContentLoaded", onDocumentLoad);
+        
+
+            let mobileNav = !1;
+            function onResize() {
+                const e = document.querySelector("#details"),
+                    t = document.querySelector("#main-content"),
+                    i = e.classList.contains(HIDDEN_CLASS),
+                    n = document.querySelector(".runner-container");
+                mobileNav !==
+                    window.matchMedia(
+                        "(min-width: 240px) and (max-width: 420px) and (min-height: 401px), (max-height: 560px) and (min-height: 240px) and (min-width: 421px)"
+                    ).matches &&
+                    ((mobileNav = !mobileNav)
+                        ? (t.classList.toggle(HIDDEN_CLASS, !i),
+                          e.classList.toggle(HIDDEN_CLASS, i),
+                          n && n.classList.toggle(HIDDEN_CLASS, !i))
+                        : i ||
+                          (t.classList.remove(HIDDEN_CLASS),
+                          e.classList.remove(HIDDEN_CLASS),
+                          n && n.classList.remove(HIDDEN_CLASS)));
+            }
+            function setupMobileNav() {
+                window.addEventListener("resize", onResize), onResize();
+            }
+            document.addEventListener("DOMContentLoaded", setupMobileNav);
+        
+
+            function Runner(t, e) {
             if (Runner.instance_) return Runner.instance_;
             (Runner.instance_ = this),
                 (this.outerContainerEl = document.querySelector(t)),
@@ -475,8 +703,6 @@ function Runner(t, e) {
                 },
                 updateConfigSetting(t, e) {
                     if (t in this.config && void 0 !== e)
-
-
                         switch (((this.config[t] = e), t)) {
                             case "GRAVITY":
                             case "MIN_JUMP_HEIGHT":
@@ -541,29 +767,15 @@ function Runner(t, e) {
                         ).content;
                         for (const e in Runner.sounds) {
                             let i = t.getElementById(Runner.sounds[e]).src;
-                            if (i.indexOf(",") !== -1) {
-                                const s = decodeBase64ToArrayBuffer(
-                                    (i = i.substr(i.indexOf(",") + 1))
-                                );
-                                this.audioContext.decodeAudioData(
-                                    s,
-                                    function (t, e) {
-                                        this.soundFx[t] = e;
-                                    }.bind(this, e)
-                                );
-                            } else {
-                                fetch(i)
-                                    .then((t) => t.arrayBuffer())
-                                    .then((t) =>
-                                        this.audioContext.decodeAudioData(
-                                            t,
-                                            function (t, e) {
-                                                this.soundFx[t] = e;
-                                            }.bind(this, e)
-                                        )
-                                    )
-                                    .catch(() => {});
-                            }
+                            const s = decodeBase64ToArrayBuffer(
+                                (i = i.substr(i.indexOf(",") + 1))
+                            );
+                            this.audioContext.decodeAudioData(
+                                s,
+                                function (t, e) {
+                                    this.soundFx[t] = e;
+                                }.bind(this, e)
+                            );
                         }
                     }
                 },
@@ -1196,8 +1408,6 @@ function Runner(t, e) {
                         this.tRex.update(100, Trex.status.CRASHED),
                         !this.gameOverPanel)
                     ) {
-
-
                         const t = IS_HIDPI
                             ? Runner.spriteDefinitionByType.original.HDPI
                             : Runner.spriteDefinitionByType.original.LDPI;
@@ -1903,8 +2113,6 @@ function Runner(t, e) {
                         (n = this.config.WIDTH_JUMP),
                         IS_HIDPI && ((i *= 2), (s *= 2), (n *= 2), (a *= 2), (h *= 2)),
                         (i += this.spritePos.x),
-
-
                         (s += this.spritePos.y),
                         this.flashing &&
                             (this.timer < this.config.FLASH_ON
@@ -2610,8 +2818,6 @@ function Runner(t, e) {
                         BackgroundEl.config.MAX_BG_ELS,
                         this.addBackgroundEl.bind(this),
                         this.cloudFrequency
-
-
                     ),
                         (this.backgroundEls = this.backgroundEls.filter(
                             (t) => !t.remove
@@ -2715,4 +2921,606 @@ function Runner(t, e) {
             });
         
 
-            
+            const GAME_TYPE = [];
+            let ObstacleType;
+            Runner.spriteDefinitionByType = {
+                original: {
+                    LDPI: {
+                        BACKGROUND_EL: { x: 86, y: 2 },
+                        CACTUS_LARGE: { x: 332, y: 2 },
+                        CACTUS_SMALL: { x: 228, y: 2 },
+                        OBSTACLE_2: { x: 332, y: 2 },
+                        OBSTACLE: { x: 228, y: 2 },
+                        CLOUD: { x: 86, y: 2 },
+                        HORIZON: { x: 2, y: 54 },
+                        MOON: { x: 484, y: 2 },
+                        PTERODACTYL: { x: 134, y: 2 },
+                        RESTART: { x: 2, y: 68 },
+                        TEXT_SPRITE: { x: 655, y: 2 },
+                        TREX: { x: 848, y: 2 },
+                        STAR: { x: 645, y: 2 },
+                        COLLECTABLE: { x: 2, y: 2 },
+                        ALT_GAME_END: { x: 121, y: 2 },
+                    },
+                    HDPI: {
+                        BACKGROUND_EL: { x: 166, y: 2 },
+                        CACTUS_LARGE: { x: 652, y: 2 },
+                        CACTUS_SMALL: { x: 446, y: 2 },
+                        OBSTACLE_2: { x: 652, y: 2 },
+                        OBSTACLE: { x: 446, y: 2 },
+                        CLOUD: { x: 166, y: 2 },
+                        HORIZON: { x: 2, y: 104 },
+                        MOON: { x: 954, y: 2 },
+                        PTERODACTYL: { x: 260, y: 2 },
+                        RESTART: { x: 2, y: 130 },
+                        TEXT_SPRITE: { x: 1294, y: 2 },
+                        TREX: { x: 1678, y: 2 },
+                        STAR: { x: 1276, y: 2 },
+                        COLLECTABLE: { x: 4, y: 4 },
+                        ALT_GAME_END: { x: 242, y: 4 },
+                    },
+                    MAX_GAP_COEFFICIENT: 1.5,
+                    MAX_OBSTACLE_LENGTH: 3,
+                    HAS_CLOUDS: 1,
+                    BOTTOM_PAD: 10,
+                    TREX: {
+                        WAITING_1: { x: 44, w: 44, h: 47, xOffset: 0 },
+                        WAITING_2: { x: 0, w: 44, h: 47, xOffset: 0 },
+                        RUNNING_1: { x: 88, w: 44, h: 47, xOffset: 0 },
+                        RUNNING_2: { x: 132, w: 44, h: 47, xOffset: 0 },
+                        JUMPING: { x: 0, w: 44, h: 47, xOffset: 0 },
+                        CRASHED: { x: 220, w: 44, h: 47, xOffset: 0 },
+                        COLLISION_BOXES: [
+                            new CollisionBox(22, 0, 17, 16),
+                            new CollisionBox(1, 18, 30, 9),
+                            new CollisionBox(10, 35, 14, 8),
+                            new CollisionBox(1, 24, 29, 5),
+                            new CollisionBox(5, 30, 21, 4),
+                            new CollisionBox(9, 34, 15, 4),
+                        ],
+                    },
+                    OBSTACLES: [
+                        {
+                            type: "CACTUS_SMALL",
+                            width: 17,
+                            height: 35,
+                            yPos: 105,
+                            multipleSpeed: 4,
+                            minGap: 120,
+                            minSpeed: 0,
+                            collisionBoxes: [
+                                new CollisionBox(0, 7, 5, 27),
+                                new CollisionBox(4, 0, 6, 34),
+                                new CollisionBox(10, 4, 7, 14),
+                            ],
+                        },
+                        {
+                            type: "CACTUS_LARGE",
+                            width: 25,
+                            height: 50,
+                            yPos: 90,
+                            multipleSpeed: 7,
+                            minGap: 120,
+                            minSpeed: 0,
+                            collisionBoxes: [
+                                new CollisionBox(0, 12, 7, 38),
+                                new CollisionBox(8, 0, 7, 49),
+                                new CollisionBox(13, 10, 10, 38),
+                            ],
+                        },
+                        {
+                            type: "PTERODACTYL",
+                            width: 46,
+                            height: 40,
+                            yPos: [100, 75, 50],
+                            yPosMobile: [100, 50],
+                            multipleSpeed: 999,
+                            minSpeed: 8.5,
+                            minGap: 150,
+                            collisionBoxes: [
+                                new CollisionBox(15, 15, 16, 5),
+                                new CollisionBox(18, 21, 24, 6),
+                                new CollisionBox(2, 14, 4, 3),
+                                new CollisionBox(6, 10, 4, 7),
+                                new CollisionBox(10, 8, 6, 9),
+                            ],
+                            numFrames: 2,
+                            frameRate: 1e3 / 6,
+                            speedOffset: 0.8,
+                        },
+                    ],
+                    BACKGROUND_EL: {
+                        CLOUD: {
+                            HEIGHT: 14,
+                            MAX_CLOUD_GAP: 400,
+                            MAX_SKY_LEVEL: 30,
+                            MIN_CLOUD_GAP: 100,
+                            MIN_SKY_LEVEL: 71,
+                            OFFSET: 4,
+                            WIDTH: 46,
+                            X_POS: 1,
+                            Y_POS: 120,
+                        },
+                    },
+                    BACKGROUND_EL_CONFIG: {
+                        MAX_BG_ELS: 1,
+                        MAX_GAP: 400,
+                        MIN_GAP: 100,
+                        POS: 0,
+                        SPEED: 0.5,
+                        Y_POS: 125,
+                    },
+                    LINES: [
+                        { SOURCE_X: 2, SOURCE_Y: 52, WIDTH: 600, HEIGHT: 12, YPOS: 127 },
+                    ],
+                },
+            };
+        
+
+            !(function () {
+                function t(t, e, n) {
+                    var i = (function (t, e, n) {
+                        return Function.prototype.call.apply(
+                            Array.prototype.slice,
+                            arguments
+                        );
+                    })(arguments, 2);
+                    return function () {
+                        return e.apply(t, i);
+                    };
+                }
+                function e(t) {
+                    this.i = t;
+                }
+                function n(t) {
+                    t.style.display = "";
+                }
+                function i(t) {
+                    t.style.display = "none";
+                }
+                function r(t, e) {
+                    this.l.apply(this, arguments);
+                }
+                function s(t) {
+                    for (var e in t.a) delete t.a[e];
+                    (t.f = null), m.push(t);
+                }
+                function o(t, e, n) {
+                    try {
+                        return e.call(n, t.a, t.f);
+                    } catch (t) {
+                        return b.$default;
+                    }
+                }
+                function l(t) {
+                    if (!_[t])
+                        try {
+                            var e =
+                                    "(function(a_, b_) { with (a_) with (b_) return " +
+                                    t +
+                                    " })",
+                                n = window.trustedTypes ? y.createScript(e) : e;
+                            _[t] = window.eval(n);
+                        } catch (t) {}
+                    return _[t];
+                }
+                function a(t) {
+                    for (var e = [], n = 0, i = (t = t.split(j)).length; i > n; ++n) {
+                        var r = t[n].indexOf(":");
+                        if (!(0 > r)) {
+                            var s = t[n]
+                                .substr(0, r)
+                                .replace(/^\s+/, "")
+                                .replace(/\s+$/, "");
+                            (r = l(t[n].substr(r + 1))), e.push(s, r);
+                        }
+                    }
+                    return e;
+                }
+                function u() {}
+                function c(t) {
+                    t.__jstcache ||
+                        (function (t, n) {
+                            var i = new e(n);
+                            for (i.h = [t]; i.h.length; ) {
+                                var r = i,
+                                    s = i.h.shift();
+                                for (r.i(s), s = s.firstChild; s; s = s.nextSibling)
+                                    1 == s.nodeType && r.h.push(s);
+                            }
+                        })(t, function (t) {
+                            h(t);
+                        });
+                }
+                function h(t) {
+                    if (t.__jstcache) return t.__jstcache;
+                    var e = t.getAttribute("jstcache");
+                    if (null != e) return (t.__jstcache = C[e]);
+                    e = T.length = 0;
+                    for (var n = E.length; n > e; ++e) {
+                        var i = E[e][0],
+                            r = t.getAttribute(i);
+                        (B[i] = r), null != r && T.push(i + "=" + r);
+                    }
+                    if (0 == T.length)
+                        return t.setAttribute("jstcache", "0"), (t.__jstcache = C[0]);
+                    var s = T.join("&");
+                    if ((e = A[s]))
+                        return t.setAttribute("jstcache", e), (t.__jstcache = C[e]);
+                    var o = {};
+                    for (e = 0, n = E.length; n > e; ++e) {
+                        i = (r = E[e])[0];
+                        var l = r[1];
+                        null != (r = B[i]) && (o[i] = l(r));
+                    }
+                    return (
+                        (e = "" + ++w),
+                        t.setAttribute("jstcache", e),
+                        (C[e] = o),
+                        (A[s] = e),
+                        (t.__jstcache = o)
+                    );
+                }
+                function f(t, e) {
+                    t.j.push(e), t.o.push(0);
+                }
+                function p(t) {
+                    return t.c.length ? t.c.pop() : [];
+                }
+                function d(t) {
+                    if (t.__jstcache) return t.__jstcache;
+                    var e = t.getAttribute("jstcache");
+                    return e ? (t.__jstcache = C[e]) : h(t);
+                }
+                function v(t, e) {
+                    var n = document;
+                    if (e) {
+                        var r = n.getElementById(t);
+                        if (!r) {
+                            r = e();
+                            var s = n.getElementById("jsts");
+                            s ||
+                                (((s = n.createElement("div")).id = "jsts"),
+                                i(s),
+                                (s.style.position = "absolute"),
+                                n.body.appendChild(s));
+                            var o = n.createElement("div");
+                            s.appendChild(o), (o.innerHTML = r), (r = n.getElementById(t));
+                        }
+                        n = r;
+                    } else n = n.getElementById(t);
+                    return n
+                        ? (c(n), (n = n.cloneNode(!0)).removeAttribute("id"), n)
+                        : null;
+                }
+                function g(t, e, n) {
+                    n == e.length - 1
+                        ? t.setAttribute("jsinstance", "*" + n)
+                        : t.setAttribute("jsinstance", "" + n);
+                }
+                var j = /\s*;\s*/;
+                r.prototype.l = function (t, e) {
+                    if ((this.a || (this.a = {}), e)) {
+                        var n = this.a,
+                            i = e.a;
+                        for (r in i) n[r] = i[r];
+                    } else {
+                        var r = this.a;
+                        for (n in (i = b)) r[n] = i[n];
+                    }
+                    (this.a.$this = t),
+                        (this.a.$context = this),
+                        (this.f = void 0 !== t && null != t ? t : ""),
+                        e || (this.a.$top = this.f);
+                };
+                var y,
+                    b = { $default: null },
+                    m = [];
+                (r.prototype.clone = function (t, e, n) {
+                    if (0 < m.length) {
+                        var i = m.pop();
+                        r.call(i, t, this), (t = i);
+                    } else t = new r(t, this);
+                    return (t.a.$index = e), (t.a.$count = n), t;
+                }),
+                    window.trustedTypes &&
+                        (y = trustedTypes.createPolicy("jstemplate", {
+                            createScript: function (t) {
+                                return t;
+                            },
+                        }));
+                var _ = {},
+                    w = 0,
+                    C = { 0: {} },
+                    A = {},
+                    B = {},
+                    T = [],
+                    E = [
+                        ["jsselect", l],
+                        ["jsdisplay", l],
+                        ["jsvalues", a],
+                        ["jsvars", a],
+                        [
+                            "jseval",
+                            function (t) {
+                                for (
+                                    var e = [], n = 0, i = (t = t.split(j)).length;
+                                    i > n;
+                                    ++n
+                                )
+                                    if (t[n]) {
+                                        var r = l(t[n]);
+                                        e.push(r);
+                                    }
+                                return e;
+                            },
+                        ],
+                        [
+                            "transclude",
+                            function (t) {
+                                return t;
+                            },
+                        ],
+                        ["jscontent", l],
+                        ["jsskip", l],
+                    ];
+                (u.prototype.g = function (t, e) {
+                    var r = d(e),
+                        l = r.transclude;
+                    if (l)
+                        (r = v(l))
+                            ? (e.parentNode.replaceChild(r, e),
+                              (l = p(this)).push(this.g, t, r),
+                              f(this, l))
+                            : e.parentNode.removeChild(e);
+                    else if ((r = r.jsselect)) {
+                        r = o(t, r, e);
+                        var a = e.getAttribute("jsinstance"),
+                            u = !1;
+                        a &&
+                            ("*" == a.charAt(0)
+                                ? ((a = parseInt(a.substr(1), 10)), (u = !0))
+                                : (a = parseInt(a, 10)));
+                        var c =
+                            null != r &&
+                            "object" == typeof r &&
+                            "number" == typeof r.length;
+                        l = c ? r.length : 1;
+                        var h = c && 0 == l;
+                        if (c)
+                            if (h)
+                                a
+                                    ? e.parentNode.removeChild(e)
+                                    : (e.setAttribute("jsinstance", "*0"), i(e));
+                            else if ((n(e), null === a || "" === a || (u && l - 1 > a))) {
+                                for (u = p(this), a = a || 0, c = l - 1; c > a; ++a) {
+                                    var j = e.cloneNode(!0);
+                                    e.parentNode.insertBefore(j, e),
+                                        g(j, r, a),
+                                        (h = t.clone(r[a], a, l)),
+                                        u.push(this.b, h, j, s, h, null);
+                                }
+                                g(e, r, a),
+                                    (h = t.clone(r[a], a, l)),
+                                    u.push(this.b, h, e, s, h, null),
+                                    f(this, u);
+                            } else
+                                l > a
+                                    ? ((u = r[a]),
+                                      g(e, r, a),
+                                      (h = t.clone(u, a, l)),
+                                      (u = p(this)).push(this.b, h, e, s, h, null),
+                                      f(this, u))
+                                    : e.parentNode.removeChild(e);
+                        else
+                            null == r
+                                ? i(e)
+                                : (n(e),
+                                  (h = t.clone(r, 0, 1)),
+                                  (u = p(this)).push(this.b, h, e, s, h, null),
+                                  f(this, u));
+                    } else this.b(t, e);
+                }),
+                    (u.prototype.b = function (t, e) {
+                        var r = d(e),
+                            s = r.jsdisplay;
+                        if (s) {
+                            if (!o(t, s, e)) return void i(e);
+                            n(e);
+                        }
+                        if ((s = r.jsvars))
+                            for (var l = 0, a = s.length; a > l; l += 2) {
+                                var u = s[l],
+                                    c = o(t, s[l + 1], e);
+                                t.a[u] = c;
+                            }
+                        if ((s = r.jsvalues))
+                            for (l = 0, a = s.length; a > l; l += 2)
+                                if (
+                                    ((c = s[l]),
+                                    (u = o(t, s[l + 1], e)),
+                                    "$" == c.charAt(0))
+                                )
+                                    t.a[c] = u;
+                                else if ("." == c.charAt(0)) {
+                                    for (
+                                        var h = e,
+                                            v = (c = c.substr(1).split(".")).length,
+                                            g = 0,
+                                            j = v - 1;
+                                        j > g;
+                                        ++g
+                                    ) {
+                                        var y = c[g];
+                                        h[y] || (h[y] = {}), (h = h[y]);
+                                    }
+                                    h[c[v - 1]] = u;
+                                } else
+                                    c &&
+                                        ("boolean" == typeof u
+                                            ? u
+                                                ? e.setAttribute(c, c)
+                                                : e.removeAttribute(c)
+                                            : e.setAttribute(c, "" + u));
+                        if ((s = r.jseval))
+                            for (l = 0, a = s.length; a > l; ++l) o(t, s[l], e);
+                        if (!(s = r.jsskip) || !o(t, s, e))
+                            if ((r = r.jscontent)) {
+                                if (((r = "" + o(t, r, e)), e.innerHTML != r)) {
+                                    for (; e.firstChild; )
+                                        (s = e.firstChild).parentNode.removeChild(s);
+                                    e.appendChild(this.m.createTextNode(r));
+                                }
+                            } else {
+                                for (r = p(this), s = e.firstChild; s; s = s.nextSibling)
+                                    1 == s.nodeType && r.push(this.g, t, s);
+                                r.length && f(this, r);
+                            }
+                    }),
+                    (window.jstGetTemplate = v),
+                    (window.JsEvalContext = r),
+                    (window.jstProcess = function (e, n) {
+                        var i = new u();
+                        c(n),
+                            (i.m = n
+                                ? 9 == n.nodeType
+                                    ? n
+                                    : n.ownerDocument || document
+                                : document);
+                        var r,
+                            s,
+                            o,
+                            l = t(i, i.g, e, n),
+                            a = (i.j = []),
+                            h = (i.o = []);
+                        for (i.c = [], l(); a.length; )
+                            (r = a[a.length - 1]),
+                                (l = h[h.length - 1]) >= r.length
+                                    ? ((l = i),
+                                      ((s = a.pop()).length = 0),
+                                      l.c.push(s),
+                                      h.pop())
+                                    : ((s = r[l++]),
+                                      (o = r[l++]),
+                                      (r = r[l++]),
+                                      (h[h.length - 1] = l),
+                                      s.call(i, o, r));
+                    });
+            })();
+        
+
+            var loadTimeData;
+            class LoadTimeData {
+                constructor() {
+                    this.data_ = null;
+                }
+                set data(t) {
+                    expect(!this.data_, "Re-setting data."), (this.data_ = t);
+                }
+                valueExists(t) {
+                    return t in this.data_;
+                }
+                getValue(t) {
+                    expect(this.data_, "No data. Did you remember to include strings.js?");
+                    const e = this.data_[t];
+                    return expect(void 0 !== e, "Could not find value for " + t), e;
+                }
+                getString(t) {
+                    const e = this.getValue(t);
+                    return expectIsType(t, e, "string"), e;
+                }
+                getStringF(t, e) {
+                    const n = this.getString(t);
+                    if (!n) return "";
+                    const a = Array.prototype.slice.call(arguments);
+                    return (a[0] = n), this.substituteString.apply(this, a);
+                }
+                substituteString(t, e) {
+                    const n = arguments;
+                    return t.replace(/\$(.|$|\n)/g, function (t) {
+                        return (
+                            expect(
+                                t.match(/\$[$1-9]/),
+                                "Unescaped $ found in localized string."
+                            ),
+                            "$$" === t ? "$" : n[t[1]]
+                        );
+                    });
+                }
+                getSubstitutedStringPieces(t, e) {
+                    const n = arguments;
+                    return (t.match(/(\$[1-9])|(([^$]|\$([^1-9]|$))+)/g) || []).map(
+                        function (t) {
+                            return t.match(/^\$[1-9]$/)
+                                ? { value: n[t[1]], arg: t }
+                                : (expect(
+                                      (t.match(/\$/g) || []).length % 2 == 0,
+                                      "Unescaped $ found in localized string."
+                                  ),
+                                  { value: t.replace(/\$\$/g, "$"), arg: null });
+                        }
+                    );
+                }
+                getBoolean(t) {
+                    const e = this.getValue(t);
+                    return expectIsType(t, e, "boolean"), e;
+                }
+                getInteger(t) {
+                    const e = this.getValue(t);
+                    return (
+                        expectIsType(t, e, "number"),
+                        expect(e === Math.floor(e), "Number isn't integer: " + e),
+                        e
+                    );
+                }
+                overrideValues(t) {
+                    expect(
+                        "object" == typeof t,
+                        "Replacements must be a dictionary object."
+                    );
+                    for (const e in t) this.data_[e] = t[e];
+                }
+                resetForTesting(t = null) {
+                    this.data_ = t;
+                }
+                isInitialized() {
+                    return null !== this.data_;
+                }
+            }
+            function expect(t, e) {
+                if (!t)
+                    throw new Error(
+                        "Unexpected condition on " + document.location.href + ": " + e
+                    );
+            }
+            function expectIsType(t, e, n) {
+                expect(typeof e === n, "[" + e + "] (" + t + ") is not a " + n);
+            }
+            expect(!loadTimeData, "should only include this file once"),
+                (loadTimeData = new LoadTimeData()),
+                (window.loadTimeData = loadTimeData),
+                console.warn("crbug/1173575, non-JS module files deprecated.");
+        
+
+            const pageData = {
+                dinoGameA11yAriaLabel: "Dino game, play",
+                dinoGameA11yDescription:
+                    "Dino game. A pixelated dinosaur dodges cacti and pterodactyls as it runs across a desolate landscape. When you hear an audio cue, press space to jump over obstacles.",
+                dinoGameA11yGameOver: "Game over, your score is $1.",
+                dinoGameA11yHighScore: "Your highest score is $1.",
+                dinoGameA11yJump: "Jump!",
+                dinoGameA11ySpeedToggle: "Start slower",
+                dinoGameA11yStartGame: "Game started.",
+                errorCode: "",
+                fontfamily: "'Segoe UI', Tahoma, sans-serif",
+                fontsize: "75%",
+                heading: { hostName: "dino", msg: "Press space to play" },
+                iconClass: "icon-offline",
+                language: "en",
+                textdirection: "ltr",
+                title: "chrome://dino/",
+            };
+            loadTimeData.data = pageData;
+            var tp = document.getElementById("t");
+            jstProcess(new JsEvalContext(pageData), tp);
+        
