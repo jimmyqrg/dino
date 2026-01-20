@@ -197,6 +197,13 @@
                     ? t.classList.add("suggested-left")
                     : t.classList.add("suggested-right"),
                     onDocumentLoadOrUpdate();
+                if (!document.getElementById("hard-mode-style")) {
+                    const t = document.createElement("style");
+                    (t.id = "hard-mode-style"),
+                        (t.textContent =
+                            ".hard-mode-title{display:inline-block;position:relative;}.hard-mode-char{display:inline-block;position:relative;will-change:transform;image-rendering:pixelated;}.hard-mode-title.shake,.hard-mode-char.shake{animation:hardModeShake .25s linear 1;}@keyframes hardModeShake{0%{transform:translate(0,0);}25%{transform:translate(-2px,1px);}50%{transform:translate(2px,-1px);}75%{transform:translate(-1px,-2px);}100%{transform:translate(0,0);}}"),
+                        document.head.appendChild(t);
+                }
             }
             document.addEventListener("DOMContentLoaded", onDocumentLoad);
         
@@ -646,8 +653,10 @@
                 SCORE: "offline-sound-reached",
             }),
             (Runner.keycodes = {
-                JUMP: { 38: 1, 32: 1 },
-                DUCK: { 40: 1 },
+                JUMP: { 38: 1, 32: 1, 87: 1 },
+                DUCK: { 40: 1, 83: 1, 16: 1 },
+                LEFT: { 37: 1, 65: 1 },
+                RIGHT: { 39: 1, 68: 1 },
                 RESTART: { 13: 1 },
             }),
             (Runner.events = {
@@ -814,6 +823,17 @@
                         this.a11yStatusEl.setAttribute("aria-live", "assertive"),
                         (this.a11yStatusEl.textContent = ""),
                         (Runner.a11yStatusEl = this.a11yStatusEl),
+                        (this.hardModeEnabled = !1),
+                        (this.hardModeProjectiles = []),
+                        (this.hardModeLastSpawn = 0),
+                        (this.hardModeSpawnInterval = 1200),
+                        (this.hardModeMoveLeft = !1),
+                        (this.hardModeMoveRight = !1),
+                        (this.hardModeCanvasSize = { WIDTH: 0, HEIGHT: 0 }),
+                        (this.hardModeTitleInterval = null),
+                        (this.hardModeTitleChars = null),
+                        (this.hardModeCharTimers = []),
+                        (this.hardModeTriggerHidden = !0),
                         (this.slowSpeedCheckboxLabel = document.createElement("label")),
                         (this.slowSpeedCheckboxLabel.className =
                             "slow-speed-option hidden"),
@@ -855,6 +875,35 @@
                         (this.tRex = new Trex(this.canvas, this.spriteDef.TREX)),
                         this.outerContainerEl.appendChild(this.containerEl),
                         this.outerContainerEl.appendChild(this.slowSpeedCheckboxLabel),
+                        !IS_MOBILE &&
+                            ((this.hardModeCheckboxLabel =
+                                document.createElement("label")),
+                            (this.hardModeCheckboxLabel.className =
+                                "slow-speed-option hard-mode-option hidden"),
+                            (this.hardModeCheckboxLabel.textContent = "Hard mode"),
+                            (this.hardModeCheckbox = document.createElement("input")),
+                            this.hardModeCheckbox.setAttribute("type", "checkbox"),
+                            this.hardModeCheckbox.setAttribute("title", "Hard mode"),
+                            this.hardModeCheckbox.setAttribute("tabindex", "0"),
+                            (this.hardModeToggleEl = document.createElement("span")),
+                            (this.hardModeToggleEl.className = "slow-speed-toggle"),
+                            this.hardModeCheckboxLabel.appendChild(
+                                this.hardModeCheckbox
+                            ),
+                            this.hardModeCheckboxLabel.appendChild(
+                                this.hardModeToggleEl
+                            ),
+                            this.hardModeCheckbox.addEventListener("change", () => {
+                                this.enableHardMode();
+                            }),
+                            this.hardModeTriggerHidden &&
+                                ((this.hardModeCheckboxLabel.style.display = "none"),
+                                this.hardModeCheckboxLabel.classList.add(
+                                    HIDDEN_CLASS
+                                )),
+                            this.outerContainerEl.appendChild(
+                                this.hardModeCheckboxLabel
+                            )),
                         this.startListening(),
                         this.update(),
                         window.addEventListener(
@@ -890,6 +939,31 @@
                 },
                 adjustDimensions() {
                     clearInterval(this.resizeTimerId_), (this.resizeTimerId_ = null);
+                    if (this.hardModeEnabled) {
+                        const t =
+                                this.hardModeCanvasSize.WIDTH ||
+                                window.innerWidth ||
+                                this.outerContainerEl.offsetWidth,
+                            e =
+                                this.hardModeCanvasSize.HEIGHT ||
+                                window.innerHeight ||
+                                this.outerContainerEl.offsetHeight;
+                        (this.dimensions.WIDTH = t),
+                            (this.dimensions.HEIGHT = e),
+                            (this.outerContainerEl.style.maxWidth = "none"),
+                            (this.outerContainerEl.style.width = t + "px"),
+                            (this.containerEl.style.width = t + "px"),
+                            (this.containerEl.style.height = e + "px"),
+                            (this.canvas.style.width = t + "px"),
+                            (this.canvas.style.height = e + "px"),
+                            (this.canvas.width = t),
+                            (this.canvas.height = e),
+                            Runner.updateCanvasScaling(this.canvas),
+                            this.distanceMeter.calcXPos(t),
+                            this.horizon.resize(t, e),
+                            this.horizon.reset();
+                        return;
+                    }
                     const t = window.getComputedStyle(this.outerContainerEl),
                         e = Number(t.paddingLeft.substr(0, t.paddingLeft.length - 2));
                     (this.dimensions.WIDTH = this.outerContainerEl.offsetWidth - 2 * e),
@@ -1028,8 +1102,9 @@
                                 ? ((this.fadeInTimer += e / 1e3),
                                   (this.canvasCtx.globalAlpha = this.fadeInTimer))
                                 : (this.canvasCtx.globalAlpha = 1),
-                            this.tRex.jumping && this.tRex.updateJump(e),
-                            (this.runningTime += e);
+                        this.tRex.jumping && this.tRex.updateJump(e),
+                        (this.runningTime += e),
+                        this.hardModeEnabled && this.applyHardModeMovement(e);
                         const t = this.runningTime > this.config.CLEAR_TIME;
                         if (
                             (1 !== this.tRex.jumpCount ||
@@ -1043,9 +1118,12 @@
                             (e = this.activated ? e : 0),
                                 this.horizon.update(e, this.currentSpeed, t, i);
                         }
+                        const a =
+                            this.hardModeEnabled && this.updateHardModeProjectiles(e);
                         let i =
                             t &&
                             checkForCollision(this.horizon.obstacles[0], this.tRex);
+                        a && (i = !0);
                         if (Runner.audioCues && t) {
                             const t =
                                 "COLLECTABLE" !=
@@ -1121,6 +1199,7 @@
                             case i.KEYDOWN:
                             case i.TOUCHSTART:
                             case i.POINTERDOWN:
+                            case i.CLICK:
                                 this.onKeyDown(t);
                                 break;
                             case i.KEYUP:
@@ -1169,6 +1248,13 @@
                             HIDDEN_CLASS,
                             !e && !this.crashed
                         );
+                    (Runner.audioCues || e) &&
+                        this.hardModeCheckboxLabel &&
+                        !this.hardModeTriggerHidden &&
+                        this.hardModeCheckboxLabel.classList.toggle(
+                            HIDDEN_CLASS,
+                            this.hardModeEnabled || (!e && !this.crashed)
+                        );
                 },
                 disableSpeedToggle(t) {
                     t
@@ -1195,6 +1281,7 @@
                         ),
                         document.addEventListener(Runner.events.KEYDOWN, this),
                         document.addEventListener(Runner.events.KEYUP, this),
+                        this.containerEl.addEventListener(Runner.events.CLICK, this),
                         this.containerEl.addEventListener(
                             Runner.events.TOUCHSTART,
                             this
@@ -1242,6 +1329,17 @@
                         )
                             return;
                         if (!this.crashed && !this.paused) {
+                            if (
+                                this.hardModeEnabled &&
+                                (Runner.keycodes.LEFT[t.keyCode] ||
+                                    Runner.keycodes.RIGHT[t.keyCode])
+                            ) {
+                                t.preventDefault();
+                                this.hardModeMoveLeft = !!Runner.keycodes.LEFT[t.keyCode];
+                                this.hardModeMoveRight =
+                                    !!Runner.keycodes.RIGHT[t.keyCode];
+                                return;
+                            }
                             const e =
                                 (IS_MOBILE &&
                                     t.type === Runner.events.POINTERDOWN &&
@@ -1289,7 +1387,13 @@
                             Runner.keycodes.JUMP[e] ||
                             t.type === Runner.events.TOUCHEND ||
                             t.type === Runner.events.POINTERUP;
-                    if (this.isRunning() && i) this.tRex.endJump();
+                    if (
+                        this.hardModeEnabled &&
+                        (Runner.keycodes.LEFT[e] || Runner.keycodes.RIGHT[e])
+                    ) {
+                        Runner.keycodes.LEFT[e] && (this.hardModeMoveLeft = !1);
+                        Runner.keycodes.RIGHT[e] && (this.hardModeMoveRight = !1);
+                    } else if (this.isRunning() && i) this.tRex.endJump();
                     else if (Runner.keycodes.DUCK[e])
                         (this.tRex.speedDrop = !1), this.tRex.setDuck(!1);
                     else if (this.crashed) {
@@ -1487,6 +1591,8 @@
                         this.clearCanvas(),
                         this.distanceMeter.reset(),
                         this.horizon.reset(),
+                        (this.hardModeProjectiles = []),
+                        (this.hardModeLastSpawn = 0),
                         this.tRex.reset(),
                         this.playSound(this.soundFx.BUTTON_PRESS),
                         this.invert(!0),
@@ -1504,6 +1610,175 @@
                     this.touchController &&
                         this.touchController.classList.toggle(HIDDEN_CLASS, !t),
                         (this.playing = t);
+                },
+                enableHardMode() {
+                    if (!this.hardModeCheckbox || this.hardModeEnabled) return;
+                    this.hardModeEnabled = this.hardModeCheckbox.checked;
+                    if (!this.hardModeEnabled) return;
+                    this.hardModeCheckboxLabel &&
+                        this.hardModeCheckboxLabel.classList.add(HIDDEN_CLASS);
+                    this.applyHardModeLayout();
+                    this.startHardModeTitleChaos();
+                },
+                startHardModeTitleChaos() {
+                    if (!this.hardModeTitleInterval) {
+                        this.prepareHardModeTitle();
+                        this.hardModeTitleInterval = setInterval(
+                            this.triggerHardModeTitleChaos.bind(this),
+                            1e4
+                        );
+                    }
+                    this.triggerHardModeTitleChaos();
+                },
+                prepareHardModeTitle() {
+                    if (this.hardModeTitleChars) return;
+                    const t = document.querySelector("#main-message h1 span");
+                    if (!t) return;
+                    this.hardModeTitleEl = t;
+                    t.classList.add("hard-mode-title");
+                    const e = t.textContent || "";
+                    t.textContent = "";
+                    this.hardModeTitleChars = [];
+                    for (const e of [...e]) {
+                        const i = document.createElement("span");
+                        i.className = "hard-mode-char";
+                        i.textContent = " " === e ? "\u00a0" : e;
+                        t.appendChild(i);
+                        this.hardModeTitleChars.push(i);
+                    }
+                },
+                triggerHardModeTitleChaos() {
+                    if (!this.hardModeTitleChars || !this.hardModeTitleEl) return;
+                    this.hardModeTitleEl.classList.remove("shake");
+                    void this.hardModeTitleEl.offsetWidth;
+                    this.hardModeTitleEl.classList.add("shake");
+                    this.hardModeCharTimers.forEach((t) => clearInterval(t));
+                    this.hardModeCharTimers = [];
+                    this.hardModeTitleChars.forEach((t) => {
+                        t.classList.remove("shake");
+                        t.style.transition = "transform 0.1s linear";
+                        const e = setInterval(() => {
+                            const e = (Math.random() - 0.5) * 30,
+                                i = (Math.random() - 0.5) * 30;
+                            t.style.transform = `translate(${e}px, ${i}px)`;
+                        }, 60);
+                        this.hardModeCharTimers.push(e);
+                        const i = 1e3 + Math.random() * 1e3;
+                        setTimeout(() => {
+                            clearInterval(e);
+                            t.classList.remove("shake");
+                            void t.offsetWidth;
+                            t.classList.add("shake");
+                            t.style.transition = "transform 0.4s ease";
+                            t.style.transform = "translate(0, 0)";
+                        }, i);
+                    });
+                },
+                applyHardModeLayout() {
+                    const t =
+                            this.hardModeCanvasSize.WIDTH ||
+                            window.innerWidth ||
+                            this.outerContainerEl.offsetWidth,
+                        e =
+                            this.hardModeCanvasSize.HEIGHT ||
+                            window.innerHeight ||
+                            this.outerContainerEl.offsetHeight;
+                    (this.dimensions.WIDTH = t),
+                        (this.dimensions.HEIGHT = e),
+                        (this.outerContainerEl.style.maxWidth = "none"),
+                        (this.outerContainerEl.style.width = t + "px"),
+                        (this.containerEl.style.width = t + "px"),
+                        (this.containerEl.style.height = e + "px"),
+                        (this.canvas.style.width = t + "px"),
+                        (this.canvas.style.height = e + "px"),
+                        (this.canvas.width = t),
+                        (this.canvas.height = e),
+                        Runner.updateCanvasScaling(this.canvas),
+                        this.distanceMeter.calcXPos(t),
+                        this.horizon.resize(t, e),
+                        this.horizon.reset(),
+                        this.horizon.update(0, 0, !0),
+                        this.tRex.update(0);
+                    this.containerEl.style.transition = "transform 0.6s ease";
+                    this.containerEl.style.transform = "translate(0, 0)";
+                },
+                applyHardModeMovement(t) {
+                    const e = 0.35 * t,
+                        i = (this.hardModeMoveRight ? e : 0) -
+                            (this.hardModeMoveLeft ? e : 0);
+                    i && this.moveTrex(i);
+                },
+                updateHardModeProjectiles(t) {
+                    const e = getTimeStamp();
+                    this.hardModeLastSpawn ||
+                        (this.hardModeLastSpawn = e - this.hardModeSpawnInterval);
+                    e - this.hardModeLastSpawn >= this.hardModeSpawnInterval &&
+                        (this.hardModeLastSpawn = e, this.spawnHardModeProjectile());
+                    let i = !1;
+                    for (let e = this.hardModeProjectiles.length - 1; e >= 0; e--) {
+                        const s = this.hardModeProjectiles[e];
+                        (s.x += s.vx * t),
+                            (s.y += s.vy * t),
+                            (s.angle += s.spin * t);
+                        this.drawHardModeProjectile(s);
+                        if (this.hardModeProjectileHitsTrex(s)) i = !0;
+                        (s.x < -20 ||
+                            s.x > this.dimensions.WIDTH + 20 ||
+                            s.y > this.dimensions.HEIGHT + 20) &&
+                            this.hardModeProjectiles.splice(e, 1);
+                    }
+                    return i;
+                },
+                spawnHardModeProjectile() {
+                    const t = Math.random() * Math.PI * 0.9 + Math.PI * 0.05,
+                        e = 0.35,
+                        i = window.innerWidth ? window.innerWidth / 2 : this.dimensions.WIDTH / 2,
+                        s = this.containerEl.getBoundingClientRect(),
+                        n = s.left;
+                    this.hardModeProjectiles.push({
+                        x: i - n,
+                        y: 0,
+                        vx: Math.cos(t) * e,
+                        vy: Math.sin(t) * e,
+                        r: 6,
+                        angle: 0,
+                        spin: 0.012,
+                    });
+                },
+                drawHardModeProjectile(t) {
+                    this.canvasCtx.save(),
+                        this.canvasCtx.translate(t.x, t.y),
+                        this.canvasCtx.rotate(t.angle),
+                        (this.canvasCtx.strokeStyle = "#444"),
+                        (this.canvasCtx.lineWidth = 2),
+                        this.canvasCtx.beginPath(),
+                        this.canvasCtx.arc(0, 0, t.r, 0, 2 * Math.PI),
+                        this.canvasCtx.stroke(),
+                        this.canvasCtx.beginPath(),
+                        this.canvasCtx.moveTo(-t.r, 0),
+                        this.canvasCtx.lineTo(t.r, 0),
+                        this.canvasCtx.stroke(),
+                        this.canvasCtx.restore();
+                },
+                hardModeProjectileHitsTrex(t) {
+                    const e = this.tRex.xPos,
+                        i = this.tRex.yPos,
+                        s = this.tRex.config.WIDTH,
+                        n = this.tRex.config.HEIGHT,
+                        o = Math.max(e, Math.min(t.x, e + s)),
+                        a = Math.max(i, Math.min(t.y, i + n)),
+                        r = t.x - o,
+                        h = t.y - a;
+                    return r * r + h * h <= t.r * t.r;
+                },
+                moveTrex(t) {
+                    if (!this.hardModeEnabled) return;
+                    const e = this.dimensions.WIDTH - this.tRex.config.WIDTH,
+                        i = Math.min(
+                            Math.max(0, this.tRex.xPos + t),
+                            Math.max(0, e)
+                        );
+                    this.tRex.xPos = i;
                 },
                 isArcadeMode: () =>
                     IS_RTL
@@ -1864,7 +2139,7 @@
                         (this.originalText = !0);
                 },
             }),
-            (Obstacle.MAX_GAP_COEFFICIENT = 1.5),
+            (Obstacle.MAX_GAP_COEFFICIENT = 2),
             (Obstacle.MAX_OBSTACLE_LENGTH = 3),
             (Obstacle.prototype = {
                 init(t) {
@@ -2230,7 +2505,10 @@
                           (this.update(0, Trex.status.RUNNING), (this.ducking = !1));
                 },
                 reset() {
-                    (this.xPos = this.xInitialPos),
+                    (this.xPos =
+                        Runner.instance_ && Runner.instance_.hardModeEnabled
+                            ? this.xPos
+                            : this.xInitialPos),
                         (this.yPos = this.groundYPos),
                         (this.jumpVelocity = 0),
                         (this.jumping = !1),
@@ -2959,7 +3237,7 @@
                         COLLECTABLE: { x: 4, y: 4 },
                         ALT_GAME_END: { x: 242, y: 4 },
                     },
-                    MAX_GAP_COEFFICIENT: 1.5,
+                    MAX_GAP_COEFFICIENT: 2,
                     MAX_OBSTACLE_LENGTH: 3,
                     HAS_CLOUDS: 1,
                     BOTTOM_PAD: 10,
@@ -2986,7 +3264,7 @@
                             height: 35,
                             yPos: 105,
                             multipleSpeed: 4,
-                            minGap: 120,
+                            minGap: 200,
                             minSpeed: 0,
                             collisionBoxes: [
                                 new CollisionBox(0, 7, 5, 27),
@@ -3000,7 +3278,7 @@
                             height: 50,
                             yPos: 90,
                             multipleSpeed: 7,
-                            minGap: 120,
+                            minGap: 200,
                             minSpeed: 0,
                             collisionBoxes: [
                                 new CollisionBox(0, 12, 7, 38),
@@ -3016,7 +3294,7 @@
                             yPosMobile: [100, 50],
                             multipleSpeed: 999,
                             minSpeed: 8.5,
-                            minGap: 150,
+                            minGap: 250,
                             collisionBoxes: [
                                 new CollisionBox(15, 15, 16, 5),
                                 new CollisionBox(18, 21, 24, 6),
