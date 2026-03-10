@@ -5261,7 +5261,7 @@
                 function h(t) {
                     if (t.__jstcache) return t.__jstcache;
                     var e = t.getAttribute("jstcache");
-                    if (null != e) return (t.__jstcache = C[e]);
+                    if (null != e && C[e]) return (t.__jstcache = C[e]);
                     e = T.length = 0;
                     for (var n = E.length; n > e; ++e) {
                         var i = E[e][0],
@@ -5271,7 +5271,7 @@
                     if (0 == T.length)
                         return t.setAttribute("jstcache", "0"), (t.__jstcache = C[0]);
                     var s = T.join("&");
-                    if ((e = A[s]))
+                    if ((e = A[s]) && C[e])
                         return t.setAttribute("jstcache", e), (t.__jstcache = C[e]);
                     var o = {};
                     for (e = 0, n = E.length; n > e; ++e) {
@@ -5296,7 +5296,7 @@
                 function d(t) {
                     if (t.__jstcache) return t.__jstcache;
                     var e = t.getAttribute("jstcache");
-                    return e ? (t.__jstcache = C[e]) : h(t);
+                    return e && C[e] ? (t.__jstcache = C[e]) : h(t);
                 }
                 function v(t, e) {
                     var n = document;
